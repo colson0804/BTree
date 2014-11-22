@@ -1,4 +1,5 @@
 *.o
+*.swp
 btree_delete
 btree_display
 btree_init 
