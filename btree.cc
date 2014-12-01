@@ -258,6 +258,34 @@ ERROR_T BTreeIndex::LookupOrUpdateInternal(const SIZE_T &node,
   return ERROR_INSANE;
 }
 
+ERROR_T BTreeIndex::InsertInternal(const SIZE_T &node, const KEY_T &key, VALUE_T &value)
+{
+  //If node == NULL
+    //Find the leaf node that would contain key
+
+  //If node is full
+    //Create new node
+
+    //If leaf node
+      //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to leaf nodes)
+      //Find parent of original node
+      //Add new key and value (new node) to parent (recursion)
+
+    //If interior or root node
+      //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to internal nodes)
+      //If interior node
+        //Find parent of original node
+        //Add new key and value (new node) to parent (recursion)
+      //If root node
+        //Create a new root node
+        //Add new key and value (new node) to new root (recursion)
+        //Add new key and value (old node) to new root (recursion)
+
+  //Else
+    //Add key value pair to node
+
+
+}
 
 static ERROR_T PrintNode(ostream &os, SIZE_T nodenum, BTreeNode &b, BTreeDisplayType dt)
 {
@@ -359,6 +387,9 @@ ERROR_T BTreeIndex::Lookup(const KEY_T &key, VALUE_T &value)
 ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
 {
   // WRITE ME
+
+  // Call the internal insert function with node == NULL
+
   return ERROR_UNIMPL;
 }
   
