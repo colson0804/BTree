@@ -1,6 +1,6 @@
 AR = ar
 CXX = g++
-CXXFLAGS = -g -gstabs+ -ggdb -Wall -Wno-deprecated
+CXXFLAGS = -g -ggdb -Wall -Wno-deprecated
 LDFLAGS = 
 
 LIB_OBJS = block.o         \

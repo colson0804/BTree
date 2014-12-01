@@ -17,3 +17,4 @@ readdisk
 sim
 writebuffer
 writedisk
+Makefile
