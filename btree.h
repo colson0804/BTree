@@ -71,7 +71,9 @@ class BTreeIndex {
               VALUE_T value,
               SIZE_T &newNode);
 
-  KEY_T        splitNode(SIZE_T &node, SIZE_T &newNode);
+  KEY_T        SplitNode(SIZE_T &node, SIZE_T &newNode);
+
+  SIZE_T       FindParent(SIZE_T node);
 
   ERROR_T      DisplayInternal(const SIZE_T &node,
 			       ostream &o, 

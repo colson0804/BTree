@@ -276,20 +276,22 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
   //Add key value pair to node
   if ((rc = InsertKeyValue(node, key, value, newNode))) return rc;
 
-
-  if ((rc = b.Unserialize(buffercache, superblock.info.rootnode))) return rc;
+  //Get node
+  if ((rc = b.Unserialize(buffercache, node))) return rc;
 
   //If leaf node & too full
   if(b.info.nodetype == BTREE_LEAF_NODE &&
     (int)(b.info.GetNumSlotsAsLeaf()*(2./3.)) <= b.info.numkeys)
   {
     //Create new node
-    SIZE_T newNode;
+    SIZE_T newLeafNode;
     if ((rc = AllocateNode(newNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to leaf nodes)
-    KEY_T splittingValue = splitNode(node, newNode);
+    KEY_T splittingValue = SplitNode(node, newLeafNode);
     //Find parent of original node
-    //Add new key (splitting key) and value (pointer to new node) to parent (recursion)
+    SIZE_T parent = FindParent(node);
+    //Add new key (splitting key) and value (pointer to new node) to parent (recursion) (add to right hand side)
+    if ((rc = InsertInternalRecursive(parent, splittingValue, VALUE_T((SIZE_T)1), newLeafNode))) return rc;
   }
 
   //If root or interior & too full
@@ -297,17 +299,29 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
     (int)(b.info.GetNumSlotsAsInterior()*(2./3.)) <= b.info.numkeys)
   {
     //Create new node
-    SIZE_T newNode;
+    SIZE_T newInteriorNode;
     if ((rc = AllocateNode(newNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to internal nodes)
-    KEY_T splittingValue = splitNode(node, newNode);
+    KEY_T splittingValue = SplitNode(node, newInteriorNode);
     //If interior node
+    if(b.info.nodetype == BTREE_INTERIOR_NODE)
+    {
       //Find parent of original node
-      //Add new key (splitting key) and value (new node) to parent (recursion)
+      SIZE_T parent = FindParent(node);
+      //Add new key (splitting key) and value (new node) to parent (recursion) (add to right hand side)
+      if ((rc = InsertInternalRecursive(parent, splittingValue, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
+    }
     //If root node
+    else
+    {
       //Create a new root node
-      //Add new key (splitting key) and value (new node) to new root (no recursion)
-      //Add value (old node) to new root (no recursion)
+      SIZE_T newRootNode;
+      if ((rc = AllocateNode(newNode))) return rc;
+      //Add new key (splitting key) and value (new node) to new root (no recursion) (add to right hand side)
+      if ((rc = InsertKeyValue(newRootNode, splittingValue, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
+      //Add value (old node) to new root (no recursion) (add to left hand side)
+      if ((rc = InsertKeyValue(newRootNode, splittingValue, VALUE_T((SIZE_T)0), node))) return rc;
+    }
   }
 
   return ERROR_NOERROR;
@@ -317,45 +331,46 @@ SIZE_T BTreeIndex::FindLeaf(KEY_T key)
 {
   BTreeNode b;
   ERROR_T rc;
-  SIZE_T nextNode;
+  SIZE_T currentNode;
   KEY_T testkey;
 
-  //Get the root of the tree
-  rc= b.Unserialize(buffercache, superblock.info.rootnode);
-
-  //If this fails, return 0
-  if (rc!=ERROR_NOERROR)
-    return 0;
+  //Set current node as the root of the tree
+  currentNode = superblock.info.rootnode;
 
   while(b.info.nodetype != BTREE_LEAF_NODE)
   {
+    //Get the node
+    if((rc= b.Unserialize(buffercache, superblock.info.rootnode))) return rc;
+
     // Scan through key/ptr pairs
     for (int offset=0; offset<b.info.numkeys; offset++)
     { 
-
       //Store key at offset in testkey
-      rc = b.GetKey(offset, testkey);
-      if (rc)
-        return 0;
+      if((rc = b.GetKey(offset, testkey))) return 0;
       //If testkey ==key or is less than key, we've found the correct pointer
       if (key<testkey || key==testkey)
       {
         //Get the correct pointer (to the node that's one level down)
-        rc=b.GetPtr(offset,nextNode);
-        if (rc)
-          return rc;
+        if((rc=b.GetPtr(offset,currentNode))) return 0;
         //Get the node at that pointer
-        rc = b.Unserialize(buffercache, nextNode);
-        if (rc!=ERROR_NOERROR)
-          return 0;
+        if((rc = b.Unserialize(buffercache, currentNode))) return rc;
         //Exit the for loop
         break;
       }
     }
+    //Edge case: input key is larger than any keys in current node
+    b.GetKey(b.info.numkeys-1,testkey);
+    if(testkey < key)
+    {
+      //Get the correct pointer (to the node that's one level down)
+      if((rc=b.GetPtr(b.info.numkeys,currentNode))) return 0;
+      //Get the node at that pointer
+      if((rc = b.Unserialize(buffercache, currentNode))) return 0;
+    }
   }
 
   //Return pointer to leaf node that would contain key
-  return nextNode;
+  return currentNode;
 }
 
 ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_T &newNode)
@@ -385,7 +400,6 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
 
       if (testkey==key)
       {
-        if ((rc = b.Serialize(buffercache,node))) return rc;
         return ERROR_CONFLICT;
       }
 
@@ -440,6 +454,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
           }
         }
       }
+      //Write changes back to the disk
       if ((rc=b.Serialize(buffercache,node))) return rc;
       return ERROR_NOERROR;
 
@@ -447,25 +462,41 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
     case BTREE_ROOT_NODE:
     case BTREE_INTERIOR_NODE:
 
-      //This is likely a bad thing to do (WRITE ME)
-      if (testkey == key)
-      {
-        if ((rc=b.Serialize(buffercache,node))) return rc;
-        return ERROR_CONFLICT;
-      }
-
       //Increment the number of keys
       b.info.numkeys+=1;
 
-      if (offset == b.info.numkeys-1)
+      if (testkey == key)
+      {
+        //If passed in value == 1, add to the rhs
+        if(value == VALUE_T((SIZE_T)1))
+        {
+          if ((rc = b.SetPtr(offset+1,newNode))) return rc;
+        }
+        //If passed in value == 0, add to the lfs
+        else
+        {
+          if ((rc = b.SetPtr(offset,newNode))) return rc;
+        }
+      }
+
+      else if (offset == b.info.numkeys-1)
       {
         //Add to the end of the list
         if ((rc = b.SetKey(offset,key))) return rc;
-        if ((rc = b.SetPtr(offset+1,newNode))) return rc;
+        //If passed in value == 1, add to the rhs
+        if(value == VALUE_T((SIZE_T)1))
+        {
+          if ((rc = b.SetPtr(offset+1,newNode))) return rc;
+        }
+        //If passed in value == 0, add to the lfs
+        else
+        {
+          if ((rc = b.SetPtr(offset,newNode))) return rc;
+        }
       }
 
       //Insert new key in front of testKey and a new value
-      //to the right of the new key
+      //to the right of the new key (always to the right)
       else
       {
         //Use input key-vlue as initial prev values
@@ -506,7 +537,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
           }
         }
       }
-
+      //Write changes back to the disk
       if ((rc=b.Serialize(buffercache,node))) return rc;
       return ERROR_NOERROR;
 
@@ -516,10 +547,86 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
   }
 }
 
-KEY_T BTreeIndex::splitNode(SIZE_T &node, SIZE_T &newNode)
+KEY_T BTreeIndex::SplitNode(SIZE_T &node, SIZE_T &newNode)
 {
   // WRITE ME
-  return Block((SIZE_T)0);
+  return KEY_T((SIZE_T)0);
+}
+
+SIZE_T BTreeIndex::FindParent(SIZE_T node)
+{
+  BTreeNode b;
+  ERROR_T rc;
+  SIZE_T currentNode;
+  SIZE_T prevNode;
+  KEY_T testKey;
+  KEY_T prevTestKey;
+  KEY_T largest;
+  KEY_T smallest;
+
+  //Get the input node
+  if((rc = b.Unserialize(buffercache, node))) return 0;
+
+  //Get the largest and smallest keys in the input node
+  b.GetKey(b.info.numkeys-1, largest);
+  b.GetKey(0, smallest);
+
+  //Start at the root of the tree
+  currentNode = superblock.info.rootnode;
+
+  while(b.info.nodetype != BTREE_LEAF_NODE)
+  {
+    //Get the node form the disk 
+    if((rc = b.Unserialize(buffercache, currentNode))) return 0;
+
+    //Initialize prevTestKey
+    prevTestKey = KEY_T((SIZE_T)0);
+
+    // Scan through key/ptr pairs
+    for (int offset=0; offset<b.info.numkeys; offset++)
+    { 
+      //Store key at offset in testkey
+      if((rc = b.GetKey(offset, testKey))) return 0;
+      //If key range of input node is between this key and the previous key
+      if ((largest < testKey || largest == testKey) && prevTestKey < smallest)
+      {
+        //Store the pointer to this node
+        prevNode = currentNode;
+        //Get the correct pointer (to the node that's one level down)
+        if((rc=b.GetPtr(offset,currentNode))) return 0;
+        //If the next node is the input node...
+        if(currentNode == node)
+          //Return a pointer to the prevous node
+          return prevNode;
+        //Get the node at that pointer
+        if((rc = b.Unserialize(buffercache, currentNode))) return 0;
+        //Exit the for loop
+        break;
+      }
+      else
+      {
+        prevTestKey = testKey;
+      }
+    }
+    //Edge case: input minimum is larger than any keys in current node
+    b.GetKey(b.info.numkeys-1, testKey);
+    if(testKey < smallest)
+    {
+      //Store the pointer to this node
+      prevNode = currentNode;
+      //Get the correct pointer (to the node that's one level down)
+      if((rc=b.GetPtr(b.info.numkeys,currentNode))) return 0;
+      //If the next node is the input node...
+      if(currentNode == node)
+        //Return a pointer to the prevous node
+        return prevNode;
+      //Get the node at that pointer
+      if((rc = b.Unserialize(buffercache, currentNode))) return 0;
+    }
+  }
+
+  //Return 0 to indicate no parent was found
+  return 0;
 }
 
 static ERROR_T PrintNode(ostream &os, SIZE_T nodenum, BTreeNode &b, BTreeDisplayType dt)
@@ -623,7 +730,7 @@ ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
 {
   // WRITE ME
 
-  // Call the internal insert function with node == NULL
+  // Call the internal insert function with node == 0
 
   return ERROR_UNIMPL;
 }
