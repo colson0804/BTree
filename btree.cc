@@ -261,6 +261,7 @@ ERROR_T BTreeIndex::LookupOrUpdateInternal(const SIZE_T &node,
 ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_T &newNode)
 {
   BTreeNode b;
+  BTreeNode bNew;
   ERROR_T rc;
 
   //If this is the first call before any recursion
@@ -285,7 +286,10 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
   {
     //Create new node
     SIZE_T newLeafNode;
-    if ((rc = AllocateNode(newNode))) return rc;
+    if ((rc = AllocateNode(newLeafNode))) return rc;
+    if ((rc = bNew.Unserialize(buffercache,newLeafNode))) return rc;
+    bNew.info.nodetype = BTREE_INTERIOR_NODE;
+    if ((rc = bNew.Serialize(buffercache,newLeafNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to leaf nodes)
     KEY_T splittingKey = SplitNode(node, newLeafNode);
     //Find parent of original node
@@ -300,7 +304,10 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
   {
     //Create new node
     SIZE_T newInteriorNode;
-    if ((rc = AllocateNode(newNode))) return rc;
+    if ((rc = AllocateNode(newInteriorNode))) return rc;
+    if ((rc = bNew.Unserialize(buffercache,newInteriorNode))) return rc;
+    bNew.info.nodetype = BTREE_INTERIOR_NODE;
+    if ((rc = bNew.Serialize(buffercache,newInteriorNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to internal nodes)
     KEY_T splittingKey = SplitNode(node, newInteriorNode);
     //If interior node
@@ -316,7 +323,13 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
     {
       //Create a new root node
       SIZE_T newRootNode;
-      if ((rc = AllocateNode(newNode))) return rc;
+      if ((rc = AllocateNode(newRootNode))) return rc;
+      if ((rc = bNew.Unserialize(buffercache,newRootNode))) return rc;
+      bNew.info.nodetype = BTREE_ROOT_NODE;
+      if ((rc = bNew.Serialize(buffercache,newRootNode))) return rc;
+      //Change type of old root node
+      b.info.nodetype = BTREE_ROOT_NODE;
+      if ((rc = b.Serialize(buffercache,node))) return rc;
       //Add new key (splitting key) and value (new node) to new root (no recursion) (add to right hand side)
       if ((rc = InsertKeyValue(newRootNode, splittingKey, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
       //Add value (old node) to new root (no recursion) (add to left hand side)
