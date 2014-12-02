@@ -287,11 +287,11 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
     SIZE_T newLeafNode;
     if ((rc = AllocateNode(newNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to leaf nodes)
-    KEY_T splittingValue = SplitNode(node, newLeafNode);
+    KEY_T splittingKey = SplitNode(node, newLeafNode);
     //Find parent of original node
     SIZE_T parent = FindParent(node);
     //Add new key (splitting key) and value (pointer to new node) to parent (recursion) (add to right hand side)
-    if ((rc = InsertInternalRecursive(parent, splittingValue, VALUE_T((SIZE_T)1), newLeafNode))) return rc;
+    if ((rc = InsertInternalRecursive(parent, splittingKey, VALUE_T((SIZE_T)1), newLeafNode))) return rc;
   }
 
   //If root or interior & too full
@@ -302,14 +302,14 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
     SIZE_T newInteriorNode;
     if ((rc = AllocateNode(newNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to internal nodes)
-    KEY_T splittingValue = SplitNode(node, newInteriorNode);
+    KEY_T splittingKey = SplitNode(node, newInteriorNode);
     //If interior node
     if(b.info.nodetype == BTREE_INTERIOR_NODE)
     {
       //Find parent of original node
       SIZE_T parent = FindParent(node);
       //Add new key (splitting key) and value (new node) to parent (recursion) (add to right hand side)
-      if ((rc = InsertInternalRecursive(parent, splittingValue, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
+      if ((rc = InsertInternalRecursive(parent, splittingKey, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
     }
     //If root node
     else
@@ -318,9 +318,9 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
       SIZE_T newRootNode;
       if ((rc = AllocateNode(newNode))) return rc;
       //Add new key (splitting key) and value (new node) to new root (no recursion) (add to right hand side)
-      if ((rc = InsertKeyValue(newRootNode, splittingValue, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
+      if ((rc = InsertKeyValue(newRootNode, splittingKey, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
       //Add value (old node) to new root (no recursion) (add to left hand side)
-      if ((rc = InsertKeyValue(newRootNode, splittingValue, VALUE_T((SIZE_T)0), node))) return rc;
+      if ((rc = InsertKeyValue(newRootNode, splittingKey, VALUE_T((SIZE_T)0), node))) return rc;
     }
   }
 
@@ -550,7 +550,61 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
 KEY_T BTreeIndex::SplitNode(SIZE_T &node, SIZE_T &newNode)
 {
   // WRITE ME
-  return KEY_T((SIZE_T)0);
+  BTreeNode b;
+  BTreeNode bNew;
+  ERROR_T rc;
+  KEY_T tempKey;
+  SIZE_T tempPtr;
+
+  //Get the input node
+  if((rc = b.Unserialize(buffercache, node))) return KEY_T((SIZE_T)0);
+  //Get the input new node
+  if((rc = bNew.Unserialize(buffercache, newNode))) return KEY_T((SIZE_T)0);
+
+
+  //Get the total number of keys
+  SIZE_T totalKeyNum = b.info.numkeys;
+  //Get index of halfway point
+  SIZE_T halfOffset = totalKeyNum/2;
+  //Get splitting key (last key to be left in original node)
+  KEY_T splittingKey;
+  if((rc=b.GetKey(halfOffset-1,splittingKey))) return KEY_T((SIZE_T)0);
+
+  //Initialize offset for new node
+  SIZE_T iNew = 0;
+
+  //Move key-value pairs from one node to the other
+  for (SIZE_T i=halfOffset; i<totalKeyNum; i++)
+  {
+    //Get key-value pair from node
+    if((rc=b.GetKey(i,tempKey))) return KEY_T((SIZE_T)0);
+    if((rc=b.GetPtr(i,tempPtr))) return KEY_T((SIZE_T)0);
+    b.info.numkeys--;
+
+    //Insert key-value pair into new node
+    if((rc=bNew.SetKey(iNew,tempKey))) return KEY_T((SIZE_T)0);
+    if((rc=bNew.SetPtr(iNew,tempPtr))) return KEY_T((SIZE_T)0);
+    bNew.info.numkeys++;
+
+    //Increment the new node offset
+    iNew++;
+  }
+
+  //If we are splitting an interior or root node, there will be one more pointer at the end
+  if(b.info.nodetype == BTREE_INTERIOR_NODE || b.info.nodetype == BTREE_ROOT_NODE)
+  {
+    //Get value from node
+    if((rc=b.GetPtr(totalKeyNum,tempPtr))) return KEY_T((SIZE_T)0);
+    //Insert value into new node
+    if((rc=bNew.SetPtr(iNew,tempPtr))) return KEY_T((SIZE_T)0);
+  }
+
+  //Write the input node to disk
+  if((rc = b.Serialize(buffercache, node))) return KEY_T((SIZE_T)0);
+  //Write the input new node to disk
+  if((rc = bNew.Serialize(buffercache, newNode))) return KEY_T((SIZE_T)0);
+
+  return splittingKey;
 }
 
 SIZE_T BTreeIndex::FindParent(SIZE_T node)
