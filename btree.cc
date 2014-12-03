@@ -288,7 +288,7 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
     SIZE_T newLeafNode;
     if ((rc = AllocateNode(newLeafNode))) return rc;
     if ((rc = bNew.Unserialize(buffercache,newLeafNode))) return rc;
-    bNew.info.nodetype = BTREE_INTERIOR_NODE;
+    bNew.info.nodetype = BTREE_LEAF_NODE;
     if ((rc = bNew.Serialize(buffercache,newLeafNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to leaf nodes)
     KEY_T splittingKey = SplitNode(node, newLeafNode);
@@ -328,7 +328,7 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
       bNew.info.nodetype = BTREE_ROOT_NODE;
       if ((rc = bNew.Serialize(buffercache,newRootNode))) return rc;
       //Change type of old root node
-      b.info.nodetype = BTREE_ROOT_NODE;
+      b.info.nodetype = BTREE_INTERIOR_NODE;
       if ((rc = b.Serialize(buffercache,node))) return rc;
       //Add new key (splitting key) and value (new node) to new root (no recursion) (add to right hand side)
       if ((rc = InsertKeyValue(newRootNode, splittingKey, VALUE_T((SIZE_T)1), newInteriorNode))) return rc;
@@ -353,7 +353,7 @@ SIZE_T BTreeIndex::FindLeaf(KEY_T key)
   while(b.info.nodetype != BTREE_LEAF_NODE)
   {
     //Get the node
-    if((rc= b.Unserialize(buffercache, superblock.info.rootnode))) return rc;
+    if((rc= b.Unserialize(buffercache, superblock.info.rootnode))) return 0;
 
     // Scan through key/ptr pairs
     for (int offset=0; offset<b.info.numkeys; offset++)
@@ -366,7 +366,7 @@ SIZE_T BTreeIndex::FindLeaf(KEY_T key)
         //Get the correct pointer (to the node that's one level down)
         if((rc=b.GetPtr(offset,currentNode))) return 0;
         //Get the node at that pointer
-        if((rc = b.Unserialize(buffercache, currentNode))) return rc;
+        if((rc = b.Unserialize(buffercache, currentNode))) return 0;
         //Exit the for loop
         break;
       }
@@ -390,7 +390,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
 {
   BTreeNode b;
   ERROR_T rc;
-  KEY_T testkey;
+  KEY_T testkey = KEY_T((SIZE_T)0);
 
   //Get node from pointer
   if ((rc = b.Unserialize(buffercache, node))) return rc;
@@ -420,7 +420,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
       b.info.numkeys+=1;
 
       //If the input key isn't less than any key in the node...
-      if (offset == b.info.numkeys-1)
+      if (offset == b.info.numkeys)
       {
         //Add to the end of the list
         if ((rc = b.SetKey(offset,key))) return rc;
@@ -492,7 +492,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
         }
       }
 
-      else if (offset == b.info.numkeys-1)
+      else if (offset == b.info.numkeys)
       {
         //Add to the end of the list
         if ((rc = b.SetKey(offset,key))) return rc;
@@ -562,7 +562,6 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
 
 KEY_T BTreeIndex::SplitNode(SIZE_T &node, SIZE_T &newNode)
 {
-  // WRITE ME
   BTreeNode b;
   BTreeNode bNew;
   ERROR_T rc;
