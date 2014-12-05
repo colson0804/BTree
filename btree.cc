@@ -264,6 +264,24 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
   BTreeNode bNew;
   ERROR_T rc;
 
+  //If root node has no keys...
+  if ((rc = b.Unserialize(buffercache, superblock.info.rootnode))) return rc;
+  if (b.info.numkeys == 0)
+  {
+    //Make new leaf node
+    SIZE_T newLeafNode;
+    if ((rc = AllocateNode(newLeafNode))) return rc;
+    if ((rc = bNew.Unserialize(buffercache,newLeafNode))) return rc;
+    bNew.info.nodetype = BTREE_LEAF_NODE;
+    if ((rc = bNew.Serialize(buffercache,newLeafNode))) return rc;
+    //Insert key/value into leaf node
+    if ((rc = InsertKeyValue(newLeafNode, key, value, newNode))) return rc;
+    //Insert leaf node pointer into root (using input key as splitting key)
+    if ((rc = InsertKeyValue(superblock.info.rootnode, key, VALUE_T((SIZE_T)0), newLeafNode))) return rc;
+
+    return ERROR_NOERROR;
+  }
+
   //If this is the first call before any recursion
   if(node == 0)
     //Find the leaf node that would contain key
@@ -328,6 +346,7 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
       bNew.info.nodetype = BTREE_ROOT_NODE;
       if ((rc = bNew.Serialize(buffercache,newRootNode))) return rc;
       superblock.info.rootnode = newRootNode;
+      superblock.Serialize(buffercache,superblock_index);
       //Change type of old root node
       b.info.nodetype = BTREE_INTERIOR_NODE;
       if ((rc = b.Serialize(buffercache,node))) return rc;
