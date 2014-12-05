@@ -389,11 +389,10 @@ SIZE_T BTreeIndex::FindLeaf(KEY_T key)
 
   //Set current node as the root of the tree
   currentNode = superblock.info.rootnode;
+  if((rc= b.Unserialize(buffercache, currentNode))) return 0;
 
   while(b.info.nodetype != BTREE_LEAF_NODE)
   {
-    //Get the node
-    if((rc= b.Unserialize(buffercache, superblock.info.rootnode))) return 0;
 
     // Scan through key/ptr pairs
     for (int offset=0; offset<b.info.numkeys; offset++)
@@ -405,8 +404,6 @@ SIZE_T BTreeIndex::FindLeaf(KEY_T key)
       {
         //Get the correct pointer (to the node that's one level down)
         if((rc=b.GetPtr(offset,currentNode))) return 0;
-        //Get the node at that pointer
-        if((rc = b.Unserialize(buffercache, currentNode))) return 0;
         //Exit the for loop
         break;
       }
@@ -417,9 +414,10 @@ SIZE_T BTreeIndex::FindLeaf(KEY_T key)
     {
       //Get the correct pointer (to the node that's one level down)
       if((rc=b.GetPtr(b.info.numkeys,currentNode))) return 0;
-      //Get the node at that pointer
-      if((rc = b.Unserialize(buffercache, currentNode))) return 0;
     }
+
+    //Get the node
+    if((rc= b.Unserialize(buffercache, currentNode))) return 0;
   }
 
   //Return pointer to leaf node that would contain key
@@ -455,16 +453,15 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T
       {
         return ERROR_CONFLICT;
       }
-
       //If the input key isn't less than any key in the node...
-      if (offset+1 == b.info.numkeys)
+      if (offset == b.info.numkeys)
       {
         //Increment the number of keys
         b.info.numkeys+=1;
 
         //Add to the end of the list
-        if ((rc = b.SetKey(offset+1,key))) return rc;
-        if ((rc = b.SetVal(offset+1,value))) return rc;
+        if ((rc = b.SetKey(offset,key))) return rc;
+        if ((rc = b.SetVal(offset,value))) return rc;
       }
 
       else
@@ -687,11 +684,10 @@ SIZE_T BTreeIndex::FindParent(SIZE_T node)
 
   //Start at the root of the tree
   currentNode = superblock.info.rootnode;
+  if((rc = b.Unserialize(buffercache, currentNode))) return 0;
 
   while(b.info.nodetype != BTREE_LEAF_NODE)
   {
-    //Get the node form the disk 
-    if((rc = b.Unserialize(buffercache, currentNode))) return 0;
 
     //Initialize prevTestKey
     prevTestKey = KEY_T((SIZE_T)0);
@@ -737,6 +733,9 @@ SIZE_T BTreeIndex::FindParent(SIZE_T node)
       //Get the node at that pointer
       if((rc = b.Unserialize(buffercache, currentNode))) return 0;
     }
+
+    //Get the node form the disk 
+    if((rc = b.Unserialize(buffercache, currentNode))) return 0;
   }
 
   //Return 0 to indicate no parent was found
@@ -846,7 +845,7 @@ ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
 
   // Call the internal insert function with node == 0
 
-  return InsertInternalRecursive(0,(KEY_T)key,(VALUE_T)value,0);
+  return InsertInternalRecursive(0, key, value, 0);
 }
   
 ERROR_T BTreeIndex::Update(const KEY_T &key, const VALUE_T &value)
