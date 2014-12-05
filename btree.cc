@@ -797,8 +797,8 @@ ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
   // WRITE ME
 
   // Call the internal insert function with node == 0
-  SIZE_T node=0, newnode=0;
-  return InsertInternalRecursive(node,(KEY_T)key,(VALUE_T)value,newnode);
+
+  return ERROR_UNIMPL;
 }
   
 ERROR_T BTreeIndex::Update(const KEY_T &key, const VALUE_T &value)
@@ -945,6 +945,44 @@ ERROR_T BTreeIndex::KeysInOrder(const SIZE_T &node) const
   return KeysInOrderRecursive(node, testkey);
 }
 
+
+ERROR_T BTreeIndex::badNodeSize(const SIZE_T &node) const
+{
+  BTreeNode b;
+  ERROR_T rc = ERROR_NOERROR;
+  KEY_T testkey;
+  KEY_T prevkey = -1;
+  SIZE_T ptr;
+  SIZE_T offset;
+
+
+  //Get node from pointer
+  if ((rc = b.Unserialize(buffercache, node))) return rc;
+
+  if (b.info.nodetype == BTREE_LEAF_NODE)
+  {
+    // Is leafnode too big or too small?? 
+  }
+  else  // Interior or root node
+  {  
+    //Find place in key list
+    // Also check size of interior node
+    for (offset = 0; offset<b.info.numkeys; offset++)
+    { 
+      if ((rc=b.GetPtr(offset, ptr))) return rc;
+      return KeysInOrder(ptr);
+    }
+    if (b.info.numkeys>0) { 
+      if ((rc=b.GetPtr(b.info.numkeys, ptr))) return rc;
+      return KeysInOrder(ptr);
+    } else {
+      // There are no keys at all on this node, so nowhere to go
+      return ERROR_NONEXISTENT;
+    }
+  }
+  return rc;
+}
+
 ERROR_T BTreeIndex::SanityCheck() const
 {
   ERROR_T rc;
@@ -959,10 +997,9 @@ ERROR_T BTreeIndex::SanityCheck() const
 
   // Check to see if each node is either too full or too empty
 
+
   return ERROR_UNIMPL;
 }
-  
-
 
 ostream & BTreeIndex::Print(ostream &os) const
 {

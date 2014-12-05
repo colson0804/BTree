@@ -138,9 +138,13 @@ public:
 
 
   // HELPER FUNCTIONS FOR SANITY CHECK
+
   // Check whether the keys in the leaves are in order
   ERROR_T KeysInOrderRecursive(const SIZE_T &node, KEY_T testkey) const;
   ERROR_T KeysInOrder(const SIZE_T &node) const;
+
+  // Check whether each node is either too full or too empty
+  ERROR_T badNodeSize(const SIZE_T &node) const;
 
   // Here you should figure out if your index makes sense
   // Is it a tree?  Is it in order?  Is it balanced?  Does each node have
