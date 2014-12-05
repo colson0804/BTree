@@ -258,7 +258,7 @@ ERROR_T BTreeIndex::LookupOrUpdateInternal(const SIZE_T &node,
   return ERROR_INSANE;
 }
 
-ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_T &newNode)
+ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T newNode)
 {
   BTreeNode b;
   BTreeNode bNew;
@@ -268,18 +268,8 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
   if ((rc = b.Unserialize(buffercache, superblock.info.rootnode))) return rc;
   if (b.info.numkeys == 0)
   {
-    //Make new leaf node
-    SIZE_T newLeafNode;
-    if ((rc = AllocateNode(newLeafNode))) return rc;
-    if ((rc = bNew.Unserialize(buffercache,newLeafNode))) return rc;
-    bNew.info.nodetype = BTREE_LEAF_NODE;
-    if ((rc = bNew.Serialize(buffercache,newLeafNode))) return rc;
-    //Insert key/value into leaf node
-    if ((rc = InsertKeyValue(newLeafNode, key, value, newNode))) return rc;
-    //Insert leaf node pointer into root (using input key as splitting key)
-    if ((rc = InsertKeyValue(superblock.info.rootnode, key, VALUE_T((SIZE_T)0), newLeafNode))) return rc;
-
-    return ERROR_NOERROR;
+    rc = makeTree(b, key, value);
+    return rc;
   }
 
   //If this is the first call before any recursion
@@ -360,6 +350,36 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
   return ERROR_NOERROR;
 }
 
+ERROR_T BTreeIndex::makeTree(BTreeNode referenceNode, KEY_T key, VALUE_T value)
+{
+  BTreeNode bNew;
+  ERROR_T rc;
+
+  //Make new leaf node
+  SIZE_T newLeafNode1;
+  if ((rc = AllocateNode(newLeafNode1))) return rc;
+  bNew = referenceNode;
+  bNew.info.nodetype = BTREE_LEAF_NODE;
+  bNew.info.numkeys = 0;
+  if ((rc = bNew.Serialize(buffercache,newLeafNode1))) return rc;
+  //Insert key/value into leaf node
+  if ((rc = InsertKeyValue(newLeafNode1, key, value, (SIZE_T)0))) return rc;
+  //Insert leaf node pointer into root (using input key as splitting key) (LHS)
+  if ((rc = InsertKeyValue(superblock.info.rootnode, key, VALUE_T((SIZE_T)0), newLeafNode1))) return rc;
+
+  //Make Second new leaf node
+  SIZE_T newLeafNode2;
+  if ((rc = AllocateNode(newLeafNode2))) return rc;
+  bNew = referenceNode;
+  bNew.info.nodetype = BTREE_LEAF_NODE;
+  bNew.info.numkeys = 0;
+  if ((rc = bNew.Serialize(buffercache,newLeafNode2))) return rc;
+  //Insert leaf node pointer into root (using input key as splitting key) (RHS)
+  if ((rc = InsertKeyValue(superblock.info.rootnode, key, VALUE_T((SIZE_T)1), newLeafNode2))) return rc;
+
+  return ERROR_NOERROR;
+}
+
 SIZE_T BTreeIndex::FindLeaf(KEY_T key)
 {
   BTreeNode b;
@@ -406,7 +426,7 @@ SIZE_T BTreeIndex::FindLeaf(KEY_T key)
   return currentNode;
 }
 
-ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_T &newNode)
+ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T newNode)
 {
   BTreeNode b;
   ERROR_T rc;
@@ -436,12 +456,12 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
         return ERROR_CONFLICT;
       }
 
-      //Increment the number of keys
-      b.info.numkeys+=1;
-
       //If the input key isn't less than any key in the node...
       if (offset == b.info.numkeys)
       {
+        //Increment the number of keys
+        b.info.numkeys+=1;
+
         //Add to the end of the list
         if ((rc = b.SetKey(offset,key))) return rc;
         if ((rc = b.SetVal(offset,value))) return rc;
@@ -449,6 +469,9 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
 
       else
       {
+        //Increment the number of keys
+        b.info.numkeys+=1;
+
         //Use input key-vlue as initial prev values
         KEY_T keyPrev = key;
         VALUE_T valuePrev = value;
@@ -487,6 +510,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
           }
         }
       }
+
       //Write changes back to the disk
       if ((rc=b.Serialize(buffercache,node))) return rc;
       return ERROR_NOERROR;
@@ -494,9 +518,6 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
     //If root or interior node
     case BTREE_ROOT_NODE:
     case BTREE_INTERIOR_NODE:
-
-      //Increment the number of keys
-      b.info.numkeys+=1;
 
       if (testkey == key)
       {
@@ -514,6 +535,9 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
 
       else if (offset == b.info.numkeys)
       {
+        //Increment the number of keys
+        b.info.numkeys+=1;
+
         //Add to the end of the list
         if ((rc = b.SetKey(offset,key))) return rc;
         //If passed in value == 1, add to the rhs
@@ -532,6 +556,9 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
       //to the right of the new key (always to the right)
       else
       {
+        //Increment the number of keys
+        b.info.numkeys+=1;
+
         //Use input key-vlue as initial prev values
         KEY_T keyPrev = key;
         SIZE_T ptrPrev = newNode;
@@ -570,6 +597,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
           }
         }
       }
+
       //Write changes back to the disk
       if ((rc=b.Serialize(buffercache,node))) return rc;
       return ERROR_NOERROR;
@@ -580,7 +608,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T &node, KEY_T key, VALUE_T value, SIZE_
   }
 }
 
-KEY_T BTreeIndex::SplitNode(SIZE_T &node, SIZE_T &newNode)
+KEY_T BTreeIndex::SplitNode(SIZE_T node, SIZE_T newNode)
 {
   BTreeNode b;
   BTreeNode bNew;
@@ -817,8 +845,7 @@ ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
   // WRITE ME
 
   // Call the internal insert function with node == 0
-  SIZE_T node=0, newnode=0;
-  return InsertInternalRecursive(node,(KEY_T)key,(VALUE_T)value,newnode);
+  return InsertInternalRecursive(0,(KEY_T)key,(VALUE_T)value,0);
 }
   
 ERROR_T BTreeIndex::Update(const KEY_T &key, const VALUE_T &value)

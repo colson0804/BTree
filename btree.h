@@ -58,20 +58,22 @@ class BTreeIndex {
 				      const KEY_T &key,
 				      VALUE_T &val);
 
-  ERROR_T      InsertInternalRecursive(SIZE_T &node,
+  ERROR_T      InsertInternalRecursive(SIZE_T node,
               KEY_T key,
               VALUE_T value,
-              SIZE_T &newNode);
+              SIZE_T newNode);
+
+  ERROR_T      makeTree(BTreeNode referenceNode, KEY_T key, VALUE_T value);
 
   SIZE_T       FindLeaf(KEY_T key);
 
   ERROR_T      InsertKeyValue(
-              SIZE_T &node,
+              SIZE_T node,
               KEY_T key,
               VALUE_T value,
-              SIZE_T &newNode);
+              SIZE_T newNode);
 
-  KEY_T        SplitNode(SIZE_T &node, SIZE_T &newNode);
+  KEY_T        SplitNode(SIZE_T node, SIZE_T newNode);
 
   SIZE_T       FindParent(SIZE_T node);
 
