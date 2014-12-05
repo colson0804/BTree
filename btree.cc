@@ -896,12 +896,11 @@ ERROR_T BTreeIndex::Display(ostream &o, BTreeDisplayType display_type) const
   return ERROR_NOERROR;
 }
 
-
-ERROR_T BTreeIndex::KeysInOrder(const SIZE_T &node) const
+ERROR_T BTreeIndex::KeysInOrderRecursive(const SIZE_T &node, KEY_T testkey) const
 {
   BTreeNode b;
   ERROR_T rc = ERROR_NOERROR;
-  KEY_T testkey;
+  //KEY_T testkey;
   KEY_T prevkey = -1;
   SIZE_T ptr;
   SIZE_T offset;
@@ -938,10 +937,13 @@ ERROR_T BTreeIndex::KeysInOrder(const SIZE_T &node) const
       return ERROR_NONEXISTENT;
     }
   }
-  // Traverse through each leaf node
-  // And each key n the leaf node
-  // Are they in order?
   return rc;
+}
+
+ERROR_T BTreeIndex::KeysInOrder(const SIZE_T &node) const
+{
+  KEY_T testkey;
+  return KeysInOrderRecursive(node, testkey);
 }
 
 ERROR_T BTreeIndex::SanityCheck() const
