@@ -1,9 +1,10 @@
 *.o
 *.swp
+*.a
 btree_delete
 btree_display
-btree_init 
-btree_insert   
+btree_init
+btree_insert
 btree_lookup
 btree_sane
 btree_show
@@ -12,6 +13,9 @@ deletedisk
 freebuffer
 infodisk
 makedisk
+*.bitmap
+*.data
+*.config
 readbuffer
 readdisk
 sim
