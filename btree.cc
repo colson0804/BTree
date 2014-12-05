@@ -798,8 +798,8 @@ ERROR_T BTreeIndex::Insert(const KEY_T &key, const VALUE_T &value)
   // WRITE ME
 
   // Call the internal insert function with node == 0
-
-  return ERROR_UNIMPL;
+  SIZE_T node=0, newnode=0;
+  return InsertInternalRecursive(node,(KEY_T)key,(VALUE_T)value,newnode);
 }
   
 ERROR_T BTreeIndex::Update(const KEY_T &key, const VALUE_T &value)
