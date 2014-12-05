@@ -25,3 +25,4 @@ Makefile
 makedisk.*
 mydisk.*
 TEST.*
+__test.*

@@ -295,8 +295,9 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T node, KEY_T key, VALUE_T valu
     //Create new node
     SIZE_T newLeafNode;
     if ((rc = AllocateNode(newLeafNode))) return rc;
-    if ((rc = bNew.Unserialize(buffercache,newLeafNode))) return rc;
+    bNew = b;
     bNew.info.nodetype = BTREE_LEAF_NODE;
+    bNew.info.numkeys = 0;
     if ((rc = bNew.Serialize(buffercache,newLeafNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to leaf nodes)
     KEY_T splittingKey = SplitNode(node, newLeafNode);
@@ -313,8 +314,9 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T node, KEY_T key, VALUE_T valu
     //Create new node
     SIZE_T newInteriorNode;
     if ((rc = AllocateNode(newInteriorNode))) return rc;
-    if ((rc = bNew.Unserialize(buffercache,newInteriorNode))) return rc;
+    bNew = b;
     bNew.info.nodetype = BTREE_INTERIOR_NODE;
+    bNew.info.numkeys = 0;
     if ((rc = bNew.Serialize(buffercache,newInteriorNode))) return rc;
     //Split keys (including new key) and values evenly accross both nodes (splitting process specifc to internal nodes)
     KEY_T splittingKey = SplitNode(node, newInteriorNode);
@@ -332,8 +334,9 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T node, KEY_T key, VALUE_T valu
       //Create a new root node
       SIZE_T newRootNode;
       if ((rc = AllocateNode(newRootNode))) return rc;
-      if ((rc = bNew.Unserialize(buffercache,newRootNode))) return rc;
+      bNew = b;
       bNew.info.nodetype = BTREE_ROOT_NODE;
+      bNew.info.numkeys = 0;
       if ((rc = bNew.Serialize(buffercache,newRootNode))) return rc;
       superblock.info.rootnode = newRootNode;
       superblock.Serialize(buffercache,superblock_index);
@@ -612,6 +615,7 @@ KEY_T BTreeIndex::SplitNode(SIZE_T node, SIZE_T newNode)
   ERROR_T rc;
   KEY_T tempKey;
   SIZE_T tempPtr;
+  VALUE_T tempVal;
 
   //Get the input node
   if((rc = b.Unserialize(buffercache, node))) return KEY_T((SIZE_T)0);
@@ -630,30 +634,51 @@ KEY_T BTreeIndex::SplitNode(SIZE_T node, SIZE_T newNode)
   //Initialize offset for new node
   SIZE_T iNew = 0;
 
-  //Move key-value pairs from one node to the other
-  for (SIZE_T i=halfOffset; i<totalKeyNum; i++)
+  if(b.info.nodetype == BTREE_LEAF_NODE)
   {
-    //Get key-value pair from node
-    if((rc=b.GetKey(i,tempKey))) return KEY_T((SIZE_T)0);
-    if((rc=b.GetPtr(i,tempPtr))) return KEY_T((SIZE_T)0);
-    b.info.numkeys--;
+    //Move key-value pairs from one node to the other
+    for (SIZE_T i=halfOffset; i<totalKeyNum; i++)
+    {
+      //Get key-value pair from node
+      if((rc=b.GetKey(i,tempKey))) return KEY_T((SIZE_T)0);
+      if((rc=b.GetVal(i,tempVal))) return KEY_T((SIZE_T)0);
 
-    //Insert key-value pair into new node
-    if((rc=bNew.SetKey(iNew,tempKey))) return KEY_T((SIZE_T)0);
-    if((rc=bNew.SetPtr(iNew,tempPtr))) return KEY_T((SIZE_T)0);
-    bNew.info.numkeys++;
+      //Insert key-value pair into new node
+      bNew.info.numkeys++;
+      if((rc=bNew.SetKey(iNew,tempKey))) return KEY_T((SIZE_T)0);
+      if((rc=bNew.SetVal(iNew,tempVal))) return KEY_T((SIZE_T)0);
 
-    //Increment the new node offset
-    iNew++;
+      //Increment the new node offset
+      iNew++;
+    }
+    b.info.numkeys = halfOffset;
   }
 
-  //If we are splitting an interior or root node, there will be one more pointer at the end
-  if(b.info.nodetype == BTREE_INTERIOR_NODE || b.info.nodetype == BTREE_ROOT_NODE)
+  else if(b.info.nodetype == BTREE_INTERIOR_NODE || b.info.nodetype == BTREE_ROOT_NODE)
   {
+    //Move key-value pairs from one node to the other
+    for (SIZE_T i=halfOffset; i<totalKeyNum; i++)
+    {
+      //Get key-value pair from node
+      if((rc=b.GetKey(i,tempKey))) return KEY_T((SIZE_T)0);
+      if((rc=b.GetPtr(i,tempPtr))) return KEY_T((SIZE_T)0);
+
+      //Insert key-value pair into new node
+      bNew.info.numkeys++;
+      if((rc=bNew.SetKey(iNew,tempKey))) return KEY_T((SIZE_T)0);
+      if((rc=bNew.SetPtr(iNew,tempPtr))) return KEY_T((SIZE_T)0);
+
+      //Increment the new node offset
+      iNew++;
+    }
+
+    //If we are splitting an interior or root node, there will be one more pointer at the end
     //Get value from node
     if((rc=b.GetPtr(totalKeyNum,tempPtr))) return KEY_T((SIZE_T)0);
     //Insert value into new node
     if((rc=bNew.SetPtr(iNew,tempPtr))) return KEY_T((SIZE_T)0);
+
+    b.info.numkeys = halfOffset;
   }
 
   //Write the input node to disk
