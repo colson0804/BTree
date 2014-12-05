@@ -1062,16 +1062,66 @@ ERROR_T BTreeIndex::SanityCheck() const
   // Possible things to test
 
   // are the keys of the tree in order??
-  if ((rc = KeysInOrder(superblock.info.rootnode)) == ERROR_NOORDER) {
-    return ERROR_NOORDER;
-  };
+  // commented so I can test my check
+//  if ((rc = KeysInOrder(superblock.info.rootnode)) == ERROR_NOORDER) {
+//    return ERROR_NOORDER;
+//  };
   // check to see if you enter the same node twice
 
   // Check to see if each node is either too full or too empty
 
+  // Check if tree is at least half full
+  if(rc = AtLeastHalfFullWrapper(superblock.info.rootnode)){return rc;}
 
   return ERROR_UNIMPL;
 }
+
+ERROR_T BTreeIndex::AtLeastHalfFullWrapper(const SIZE_T &node) const{
+	ERROR_T rc = ERROR_NOERROR;
+	float percentFull = AtLeastHalfFull(node);
+	if(percentFull<.5){
+		rc = ERROR_SIZE;
+	}
+	return rc;
+}
+float BTreeIndex::AtLeastHalfFull(const SIZE_T &node) const{
+  BTreeNode b;
+  ERROR_T rc = ERROR_NOERROR;
+  //KEY_T testkey;
+  KEY_T prevkey = -1;
+  SIZE_T ptr;
+  SIZE_T offset;
+
+
+  //Get node from pointer
+  if ((rc = b.Unserialize(buffercache, node))) return rc;
+
+  if (b.info.nodetype == BTREE_LEAF_NODE)
+  {
+    // count how many keys
+  	return b.info.numkeys/(float)b.info.GetNumSlotsAsLeaf();
+  }
+  else  // Interior or root node
+  {  
+	float percentFull;
+    //Find next node
+    for (offset = 0; offset<b.info.numkeys; offset++)
+    { 
+	  
+      if ((rc=b.GetPtr(offset, ptr))) return rc;
+      percentFull += AtLeastHalfFull(ptr);
+    }
+    if (b.info.numkeys>0) { 
+      if ((rc=b.GetPtr(b.info.numkeys, ptr))) return rc;
+      percentFull += AtLeastHalfFull(ptr);
+    } else {
+      // There are no keys at all on this node, so nowhere to go
+      return -9999999;
+    }
+	return percentFull/(b.info.numkeys+1);
+  }
+}
+
 
 ostream & BTreeIndex::Print(ostream &os) const
 {

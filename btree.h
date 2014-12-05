@@ -149,6 +149,9 @@ public:
   // Check whether each node is either too full or too empty
   ERROR_T badNodeSize(const SIZE_T &node) const;
 
+  //Check if tree is at least half full
+  ERROR_T AtLeastHalfFullWrapper(const SIZE_T &node) const;
+  float AtLeastHalfFull(const SIZE_T &node) const;
   // Here you should figure out if your index makes sense
   // Is it a tree?  Is it in order?  Is it balanced?  Does each node have
   // a valid use ratio?
