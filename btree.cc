@@ -897,9 +897,67 @@ ERROR_T BTreeIndex::Display(ostream &o, BTreeDisplayType display_type) const
 }
 
 
+ERROR_T BTreeIndex::KeysInOrder(const SIZE_T &node) const
+{
+  BTreeNode b;
+  ERROR_T rc = ERROR_NOERROR;
+  KEY_T testkey;
+  KEY_T prevkey = -1;
+  SIZE_T ptr;
+  SIZE_T offset;
+
+
+  //Get node from pointer
+  if ((rc = b.Unserialize(buffercache, node))) return rc;
+
+  if (b.info.nodetype == BTREE_LEAF_NODE)
+  {
+    // Check to see that keys within leafnode are in correct order
+    for (offset = 0; offset<b.info.numkeys; offset++) 
+    {
+      prevkey = testkey;
+      if ((rc=b.GetKey(offset, testkey))) return rc;
+      if (testkey < prevkey) {
+        return ERROR_NOORDER;
+      }
+    }
+  }
+  else  // Interior or root node
+  {  
+    //Find place in key list
+    for (offset = 0; offset<b.info.numkeys; offset++)
+    { 
+      if ((rc=b.GetPtr(offset, ptr))) return rc;
+      return KeysInOrder(ptr);
+    }
+    if (b.info.numkeys>0) { 
+      if ((rc=b.GetPtr(b.info.numkeys, ptr))) return rc;
+      return KeysInOrder(ptr);
+    } else {
+      // There are no keys at all on this node, so nowhere to go
+      return ERROR_NONEXISTENT;
+    }
+  }
+  // Traverse through each leaf node
+  // And each key n the leaf node
+  // Are they in order?
+  return rc;
+}
+
 ERROR_T BTreeIndex::SanityCheck() const
 {
-  // WRITE ME
+  ERROR_T rc;
+
+  // Possible things to test
+
+  // are the keys of the tree in order??
+  if ((rc = KeysInOrder(superblock.info.rootnode)) == ERROR_NOORDER) {
+    return ERROR_NOORDER;
+  };
+  // check to see if you enter the same node twice
+
+  // Check to see if each node is either too full or too empty
+
   return ERROR_UNIMPL;
 }
   
