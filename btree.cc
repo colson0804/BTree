@@ -327,6 +327,7 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T &node, KEY_T key, VALUE_T val
       if ((rc = bNew.Unserialize(buffercache,newRootNode))) return rc;
       bNew.info.nodetype = BTREE_ROOT_NODE;
       if ((rc = bNew.Serialize(buffercache,newRootNode))) return rc;
+      superblock.info.rootnode = newRootNode;
       //Change type of old root node
       b.info.nodetype = BTREE_INTERIOR_NODE;
       if ((rc = b.Serialize(buffercache,node))) return rc;
