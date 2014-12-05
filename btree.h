@@ -71,7 +71,8 @@ class BTreeIndex {
               SIZE_T node,
               KEY_T key,
               VALUE_T value,
-              SIZE_T newNode);
+              SIZE_T newNode,
+              bool rhs);
 
   KEY_T        SplitNode(SIZE_T node, SIZE_T newNode);
 
