@@ -240,10 +240,10 @@ ERROR_T BTreeIndex::LookupOrUpdateInternal(const SIZE_T &node,
 	} else { 
 	  // BTREE_OP_UPDATE
 	  if(op==BTREE_OP_UPDATE){
-		return b.SetVal(offset,value);
+		if((rc = b.SetVal(offset,value))) return rc;
+    rc = b.Serialize(buffercache, node);
+    return rc;
 	  }
-	  // WRITE ME
-	  //return ERROR_UNIMPL;
 	}
       }
     }
