@@ -1071,16 +1071,18 @@ ERROR_T BTreeIndex::SanityCheck() const
   // Check to see if each node is either too full or too empty
 
   // Check if tree is at least half full
-  if(rc = AtLeastHalfFullWrapper(superblock.info.rootnode)){return rc;}
+  if(rc = AtLeastHalfFullWrapper((SIZE_T)1)){return rc;}
 
   return ERROR_UNIMPL;
 }
 
 ERROR_T BTreeIndex::AtLeastHalfFullWrapper(const SIZE_T &node) const{
+	std::printf("Start node:%d\n",node);
 	ERROR_T rc = ERROR_NOERROR;
 	float percentFull = AtLeastHalfFull(node);
 	if(percentFull<.5){
 		rc = ERROR_SIZE;
+		std::printf("%f\n",percentFull);
 	}
 	return rc;
 }
@@ -1103,7 +1105,7 @@ float BTreeIndex::AtLeastHalfFull(const SIZE_T &node) const{
   }
   else  // Interior or root node
   {  
-	float percentFull;
+	float percentFull=0;
     //Find next node
     for (offset = 0; offset<b.info.numkeys; offset++)
     { 
@@ -1116,8 +1118,11 @@ float BTreeIndex::AtLeastHalfFull(const SIZE_T &node) const{
       percentFull += AtLeastHalfFull(ptr);
     } else {
       // There are no keys at all on this node, so nowhere to go
-      return -9999999;
-    }
+   		
+		std::printf("Didn't want to get here...\n"); 
+		std::printf("Node number: %d\nNode Type: %d\nNumKeys: %d\n",node,b.info.nodetype,b.info.numkeys);
+		percentFull = 0.5; //Doing this won't affect whether our average is off
+	}
 	return percentFull/(b.info.numkeys+1);
   }
 }
