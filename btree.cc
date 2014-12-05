@@ -457,14 +457,14 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T
       }
 
       //If the input key isn't less than any key in the node...
-      if (offset == b.info.numkeys)
+      if (offset+1 == b.info.numkeys)
       {
         //Increment the number of keys
         b.info.numkeys+=1;
 
         //Add to the end of the list
-        if ((rc = b.SetKey(offset,key))) return rc;
-        if ((rc = b.SetVal(offset,value))) return rc;
+        if ((rc = b.SetKey(offset+1,key))) return rc;
+        if ((rc = b.SetVal(offset+1,value))) return rc;
       }
 
       else
@@ -472,7 +472,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T
         //Increment the number of keys
         b.info.numkeys+=1;
 
-        //Use input key-vlue as initial prev values
+        //Use input key-value as initial prev values
         KEY_T keyPrev = key;
         VALUE_T valuePrev = value;
         //Use key-value of testKey (1st key greater than input key) as curr values
