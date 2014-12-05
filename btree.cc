@@ -1076,6 +1076,7 @@ ERROR_T BTreeIndex::SanityCheck() const
 ostream & BTreeIndex::Print(ostream &os) const
 {
   // WRITE ME
+  Display(os, BTREE_SORTED_KEYVAL);
   return os;
 }
 
