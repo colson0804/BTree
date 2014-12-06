@@ -971,7 +971,6 @@ ERROR_T BTreeIndex::KeysInOrderRecursive(const SIZE_T &node, KEY_T testkey) cons
 {
   BTreeNode b;
   ERROR_T rc = ERROR_NOERROR;
-  //KEY_T testkey;
   KEY_T prevkey = -1;
   SIZE_T ptr;
   SIZE_T offset;
@@ -998,11 +997,11 @@ ERROR_T BTreeIndex::KeysInOrderRecursive(const SIZE_T &node, KEY_T testkey) cons
     for (offset = 0; offset<b.info.numkeys; offset++)
     { 
       if ((rc=b.GetPtr(offset, ptr))) return rc;
-      return KeysInOrder(ptr);
+      if ((rc = KeysInOrderRecursive(ptr, testkey))) return rc;
     }
     if (b.info.numkeys>0) { 
       if ((rc=b.GetPtr(b.info.numkeys, ptr))) return rc;
-      return KeysInOrder(ptr);
+      if ((rc = KeysInOrderRecursive(ptr, testkey))) return rc;
     } else {
       // There are no keys at all on this node, so nowhere to go
       return ERROR_NONEXISTENT;
@@ -1014,64 +1013,27 @@ ERROR_T BTreeIndex::KeysInOrderRecursive(const SIZE_T &node, KEY_T testkey) cons
 ERROR_T BTreeIndex::KeysInOrder(const SIZE_T &node) const
 {
   KEY_T testkey;
-  return KeysInOrderRecursive(node, testkey);
-}
-
-
-ERROR_T BTreeIndex::badNodeSize(const SIZE_T &node) const
-{
-  BTreeNode b;
-  ERROR_T rc = ERROR_NOERROR;
-  KEY_T testkey;
-  KEY_T prevkey = -1;
-  SIZE_T ptr;
-  SIZE_T offset;
-
-
-  //Get node from pointer
-  if ((rc = b.Unserialize(buffercache, node))) return rc;
-
-  if (b.info.nodetype == BTREE_LEAF_NODE)
-  {
-    // Is leafnode too big or too small?? 
-  }
-  else  // Interior or root node
-  {  
-    //Find place in key list
-    // Also check size of interior node
-    for (offset = 0; offset<b.info.numkeys; offset++)
-    { 
-      if ((rc=b.GetPtr(offset, ptr))) return rc;
-      return KeysInOrder(ptr);
-    }
-    if (b.info.numkeys>0) { 
-      if ((rc=b.GetPtr(b.info.numkeys, ptr))) return rc;
-      return KeysInOrder(ptr);
-    } else {
-      // There are no keys at all on this node, so nowhere to go
-      return ERROR_NONEXISTENT;
-    }
+  ERROR_T rc;
+  rc = KeysInOrderRecursive(node, testkey);
+  if (rc) {
+    std::printf("Returned error %d\n", rc);
+  } else {
+    std::printf("Keys are in order!\n");
   }
   return rc;
 }
+
 
 ERROR_T BTreeIndex::SanityCheck() const
 {
   ERROR_T rc;
 
   // Possible things to test
-
   // are the keys of the tree in order??
-  // commented so I can test my check
-//  if ((rc = KeysInOrder(superblock.info.rootnode)) == ERROR_NOORDER) {
-//    return ERROR_NOORDER;
-//  };
-  // check to see if you enter the same node twice
-
-  // Check to see if each node is either too full or too empty
+  if((rc = KeysInOrder(superblock.info.rootnode))) {return rc;}
 
   // Check if tree is at least half full
-  if(rc = AtLeastHalfFullWrapper((SIZE_T)1)){return rc;}
+  if((rc = AtLeastHalfFullWrapper((SIZE_T)1))) {return rc;}
 
   return ERROR_UNIMPL;
 }
@@ -1130,7 +1092,6 @@ float BTreeIndex::AtLeastHalfFull(const SIZE_T &node) const{
 
 ostream & BTreeIndex::Print(ostream &os) const
 {
-  // WRITE ME
   Display(os, BTREE_SORTED_KEYVAL);
   return os;
 }

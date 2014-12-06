@@ -147,9 +147,6 @@ public:
   ERROR_T KeysInOrderRecursive(const SIZE_T &node, KEY_T testkey) const;
   ERROR_T KeysInOrder(const SIZE_T &node) const;
 
-  // Check whether each node is either too full or too empty
-  ERROR_T badNodeSize(const SIZE_T &node) const;
-
   //Check if tree is at least half full
   ERROR_T AtLeastHalfFullWrapper(const SIZE_T &node) const;
   float AtLeastHalfFull(const SIZE_T &node) const;
