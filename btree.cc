@@ -342,6 +342,7 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T node, KEY_T key, VALUE_T valu
       superblock.info.rootnode = newRootNode;
       superblock.Serialize(buffercache,superblock_index);
       //Change type of old root node
+      if ((rc = b.Unserialize(buffercache,node))) return rc;
       b.info.nodetype = BTREE_INTERIOR_NODE;
       if ((rc = b.Serialize(buffercache,node))) return rc;
       //Add new key (splitting key) and value (new node) to new root (no recursion) (add to right hand side)
@@ -462,6 +463,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T
       {
         //Increment the number of keys
         b.info.numkeys+=1;
+        superblock.info.numkeys++;
 
         //Add to the end of the list
         if ((rc = b.SetKey(offset,key))) return rc;
@@ -472,6 +474,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T
       {
         //Increment the number of keys
         b.info.numkeys+=1;
+        superblock.info.numkeys++;
 
         //Use input key-value as initial prev values
         KEY_T keyPrev = key;
@@ -538,6 +541,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T
       {
         //Increment the number of keys
         b.info.numkeys+=1;
+        superblock.info.numkeys++;
 
         //Add to the end of the list
         if ((rc = b.SetKey(offset,key))) return rc;
@@ -559,6 +563,7 @@ ERROR_T BTreeIndex::InsertKeyValue(SIZE_T node, KEY_T key, VALUE_T value, SIZE_T
       {
         //Increment the number of keys
         b.info.numkeys+=1;
+        superblock.info.numkeys++;
 
         //Use input key-vlue as initial prev values
         KEY_T keyPrev = key;
@@ -686,6 +691,8 @@ KEY_T BTreeIndex::SplitNode(SIZE_T node, SIZE_T newNode)
   if((rc = b.Serialize(buffercache, node))) return KEY_T((SIZE_T)0);
   //Write the input new node to disk
   if((rc = bNew.Serialize(buffercache, newNode))) return KEY_T((SIZE_T)0);
+
+  if((rc = b.Unserialize(buffercache, node))) return KEY_T((SIZE_T)0);
 
   return splittingKey;
 }
