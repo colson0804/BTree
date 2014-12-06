@@ -1,5 +1,6 @@
 #include <assert.h>
 #include "btree.h"
+#include <math.h>
 
 KeyValuePair::KeyValuePair()
 {}
@@ -290,7 +291,7 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T node, KEY_T key, VALUE_T valu
 
   //If leaf node & too full
   if(b.info.nodetype == BTREE_LEAF_NODE &&
-    (int)(b.info.GetNumSlotsAsLeaf()*(2./3.)) <= b.info.numkeys)
+    ceil((b.info.GetNumSlotsAsLeaf()*(2./3.))) <= b.info.numkeys)
   {
     //Create new node
     SIZE_T newLeafNode;
@@ -309,7 +310,7 @@ ERROR_T BTreeIndex::InsertInternalRecursive(SIZE_T node, KEY_T key, VALUE_T valu
 
   //If root or interior & too full
   else if((b.info.nodetype == BTREE_INTERIOR_NODE || b.info.nodetype == BTREE_ROOT_NODE) &&
-    (int)(b.info.GetNumSlotsAsInterior()*(2./3.)) <= b.info.numkeys)
+    ceil((b.info.GetNumSlotsAsInterior()*(2./3.))) <= b.info.numkeys)
   {
     //Create new node
     SIZE_T newInteriorNode;
@@ -1033,7 +1034,7 @@ ERROR_T BTreeIndex::SanityCheck() const
   if((rc = KeysInOrder(superblock.info.rootnode))) {return rc;}
 
   // Check if tree is at least half full
-  if((rc = AtLeastHalfFullWrapper((SIZE_T)1))) {return rc;}
+  if((rc = AtLeastHalfFullWrapper((SIZE_T)1))) return rc;
 
   return ERROR_UNIMPL;
 }
